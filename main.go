@@ -9,6 +9,7 @@ import (
 )
 
 var version = "dev"
+var commit = ""
 
 func main() {
 	opts := providerserver.ServeOpts{
