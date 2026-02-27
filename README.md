@@ -127,13 +127,13 @@ export S2_ACCESS_TOKEN="<your access token>"
 make testacc
 ```
 
-Run acceptance tests against an already-running local S2 Lite:
+Run acceptance tests against an already-running local `s2-lite`:
 
 ```bash
 make testacc-lite
 ```
 
-To start and stop S2 Lite automatically with the `s2` CLI binary:
+To start and stop `s2-lite` automatically with the `s2` CLI binary:
 
 ```bash
 make testacc-lite-managed
@@ -145,7 +145,7 @@ You can override defaults if needed (port, URLs, timeout, binary path):
 make testacc-lite-managed S2_LITE_BIN=s2 S2_LITE_PORT=18080 S2_LITE_WAIT_SECS=300
 ```
 
-Note: S2 Lite currently does not implement `/access-tokens`, so access-token
+Note: `s2-lite` currently does not implement `/access-tokens`, so access-token
 acceptance tests are skipped for Lite acceptance targets.
 
 ## Feedback
