@@ -1,0 +1,52 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Install latest s2 CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/s2-streamstore/s2/main/install.sh | bash
+          for p in "$HOME/.s2/bin" "$HOME/.local/bin" "$HOME/.cargo/bin"; do
+            if [ -d "$p" ]; then
+              echo "$p" >> "$GITHUB_PATH"
+            fi
+          done
+          export PATH="$HOME/.s2/bin:$HOME/.local/bin:$HOME/.cargo/bin:$PATH"
+          command -v s2
+          s2 --version
+
+      - name: Acceptance tests against S2 Lite
+        run: make testacc-lite-managed
+
+      - name: Install tfplugindocs
+        run: |
+          go install github.com/hashicorp/terraform-plugin-docs/cmd/tfplugindocs@v0.24.0
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Verify generated docs are up to date
+        run: |
+          make generate
+          git diff --exit-code
