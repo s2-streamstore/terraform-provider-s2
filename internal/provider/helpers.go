@@ -179,10 +179,12 @@ func flattenStreamConfig(cfg *s2.StreamConfig) StreamConfigModel {
 		"uncapped": timestamping.Uncapped,
 	})
 
-	deleteOnEmpty := flattenDeleteOnEmpty(cfg.DeleteOnEmpty)
-	model.DeleteOnEmpty = types.ObjectValueMust(deleteOnEmptyAttrTypes(), map[string]attr.Value{
-		"min_age_secs": deleteOnEmpty.MinAgeSecs,
-	})
+	if cfg.DeleteOnEmpty != nil {
+		deleteOnEmpty := flattenDeleteOnEmpty(cfg.DeleteOnEmpty)
+		model.DeleteOnEmpty = types.ObjectValueMust(deleteOnEmptyAttrTypes(), map[string]attr.Value{
+			"min_age_secs": deleteOnEmpty.MinAgeSecs,
+		})
+	}
 
 	return model
 }
