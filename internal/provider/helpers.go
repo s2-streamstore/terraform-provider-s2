@@ -179,12 +179,10 @@ func flattenStreamConfig(cfg *s2.StreamConfig) StreamConfigModel {
 		"uncapped": timestamping.Uncapped,
 	})
 
-	if cfg.DeleteOnEmpty != nil {
-		deleteOnEmpty := flattenDeleteOnEmpty(cfg.DeleteOnEmpty)
-		model.DeleteOnEmpty = types.ObjectValueMust(deleteOnEmptyAttrTypes(), map[string]attr.Value{
-			"min_age_secs": deleteOnEmpty.MinAgeSecs,
-		})
-	}
+	deleteOnEmpty := flattenDeleteOnEmpty(cfg.DeleteOnEmpty)
+	model.DeleteOnEmpty = types.ObjectValueMust(deleteOnEmptyAttrTypes(), map[string]attr.Value{
+		"min_age_secs": deleteOnEmpty.MinAgeSecs,
+	})
 
 	return model
 }
@@ -904,5 +902,47 @@ func opGroupsObjectValue(model OpGroupsModel) types.Object {
 		"basin_write":   model.BasinWrite,
 		"stream_read":   model.StreamRead,
 		"stream_write":  model.StreamWrite,
+	})
+}
+
+// applyStreamConfigNullOverrides copies null fields from src into dst, so that optional
+// blocks omitted in the config (plan/prior state) are not populated with API-normalized
+// defaults in the returned state. Both arguments are value StreamConfigModels.
+func applyStreamConfigNullOverrides(src, dst StreamConfigModel) StreamConfigModel {
+	if src.RetentionPolicy.IsNull() {
+		dst.RetentionPolicy = src.RetentionPolicy
+	}
+	if src.Timestamping.IsNull() {
+		dst.Timestamping = src.Timestamping
+	}
+	if src.DeleteOnEmpty.IsNull() {
+		dst.DeleteOnEmpty = src.DeleteOnEmpty
+	}
+	return dst
+}
+
+// applyDefaultStreamConfigNullOverrides applies applyStreamConfigNullOverrides to the
+// default_stream_config nested object within a basin state, using src (plan or prior
+// state) as the source of null overrides.
+func applyDefaultStreamConfigNullOverrides(ctx context.Context, src, stateDefaultStreamConfig types.Object) types.Object {
+	if src.IsNull() || src.IsUnknown() {
+		return stateDefaultStreamConfig
+	}
+	if stateDefaultStreamConfig.IsNull() || stateDefaultStreamConfig.IsUnknown() {
+		return stateDefaultStreamConfig
+	}
+	var srcCfg, dstCfg StreamConfigModel
+	if diags := src.As(ctx, &srcCfg, basetypes.ObjectAsOptions{}); diags.HasError() {
+		return stateDefaultStreamConfig
+	}
+	if diags := stateDefaultStreamConfig.As(ctx, &dstCfg, basetypes.ObjectAsOptions{}); diags.HasError() {
+		return stateDefaultStreamConfig
+	}
+	dstCfg = applyStreamConfigNullOverrides(srcCfg, dstCfg)
+	return types.ObjectValueMust(streamConfigAttrTypes(), map[string]attr.Value{
+		"storage_class":    dstCfg.StorageClass,
+		"retention_policy": dstCfg.RetentionPolicy,
+		"timestamping":     dstCfg.Timestamping,
+		"delete_on_empty":  dstCfg.DeleteOnEmpty,
 	})
 }
