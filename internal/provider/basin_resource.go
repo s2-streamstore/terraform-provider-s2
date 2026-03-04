@@ -280,6 +280,8 @@ func (r *BasinResource) Create(ctx context.Context, req resource.CreateRequest, 
 	}
 	if plan.DefaultStreamConfig.IsNull() {
 		state.DefaultStreamConfig = plan.DefaultStreamConfig
+	} else {
+		state.DefaultStreamConfig = applyDefaultStreamConfigNullOverrides(ctx, plan.DefaultStreamConfig, state.DefaultStreamConfig)
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
@@ -339,6 +341,8 @@ func (r *BasinResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	}
 	if state.DefaultStreamConfig.IsNull() && isDefaultStreamConfig(config.DefaultStreamConfig) {
 		newState.DefaultStreamConfig = state.DefaultStreamConfig
+	} else {
+		newState.DefaultStreamConfig = applyDefaultStreamConfigNullOverrides(ctx, state.DefaultStreamConfig, newState.DefaultStreamConfig)
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
@@ -402,6 +406,8 @@ func (r *BasinResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	}
 	if plan.DefaultStreamConfig.IsNull() {
 		state.DefaultStreamConfig = plan.DefaultStreamConfig
+	} else {
+		state.DefaultStreamConfig = applyDefaultStreamConfigNullOverrides(ctx, plan.DefaultStreamConfig, state.DefaultStreamConfig)
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
