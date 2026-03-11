@@ -14,8 +14,8 @@ import (
 func testAccPreCheck(t *testing.T) {
 	t.Helper()
 
-	if testAccIsLite() && strings.TrimSpace(os.Getenv("S2_BASE_URL")) == "" {
-		t.Skip("S2_BASE_URL must be set when S2_ACC_TARGET=lite")
+	if testAccIsLite() && strings.TrimSpace(os.Getenv("S2_ACCOUNT_ENDPOINT")) == "" {
+		t.Skip("S2_ACCOUNT_ENDPOINT must be set when S2_ACC_TARGET=lite")
 	}
 
 	if strings.TrimSpace(os.Getenv("S2_ACCESS_TOKEN")) == "" && testAccIsLite() {

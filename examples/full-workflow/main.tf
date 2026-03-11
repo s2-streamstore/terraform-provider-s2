@@ -12,7 +12,7 @@ terraform {
 provider "s2" {
   # access_token is read from S2_ACCESS_TOKEN by default.
   # Optional override:
-  # base_url = "https://aws.s2.dev/v1"
+  # account_endpoint = "aws.s2.dev"
 }
 
 variable "name_prefix" {
