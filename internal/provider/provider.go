@@ -93,10 +93,6 @@ func (p *S2Provider) Configure(ctx context.Context, req provider.ConfigureReques
 	}
 	if basinEndpoint != "" {
 		clientOptions.MakeBasinBaseURL = basinEndpointToMakeBasinBaseURL(basinEndpoint)
-	} else if accountEndpoint != "" {
-		// No explicit basin endpoint: route basin traffic to the same endpoint (e.g. for local testing).
-		baseURL := clientOptions.BaseURL
-		clientOptions.MakeBasinBaseURL = func(_ string) string { return baseURL }
 	}
 
 	client := s2.New(accessToken, clientOptions)
