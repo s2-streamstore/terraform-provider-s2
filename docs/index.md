@@ -17,4 +17,4 @@ Terraform provider for S2 basins, streams, and access tokens.
 ### Optional
 
 - `access_token` (String, Sensitive) S2 access token. Can also be set via S2_ACCESS_TOKEN.
-- `base_url` (String) S2 API base URL. Can also be set via S2_BASE_URL. Defaults to "https://aws.s2.dev/v1".
+- `account_endpoint` (String) S2 account endpoint. Can also be set via S2_ACCOUNT_ENDPOINT. Defaults to the S2 production endpoint.
