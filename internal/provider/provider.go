@@ -22,6 +22,7 @@ type S2Provider struct {
 type S2ProviderModel struct {
 	AccessToken     types.String `tfsdk:"access_token"`
 	AccountEndpoint types.String `tfsdk:"account_endpoint"`
+	BasinEndpoint   types.String `tfsdk:"basin_endpoint"`
 }
 
 func New(version string) func() provider.Provider {
@@ -48,6 +49,10 @@ func (p *S2Provider) Schema(_ context.Context, _ provider.SchemaRequest, resp *p
 				Optional:    true,
 				Description: "S2 account endpoint. Can also be set via S2_ACCOUNT_ENDPOINT. Defaults to the S2 production endpoint.",
 			},
+			"basin_endpoint": providerschema.StringAttribute{
+				Optional:    true,
+				Description: "S2 basin endpoint. Supports {basin} placeholder (e.g. \"{basin}.b.aws.s2.dev\"). Can also be set via S2_BASIN_ENDPOINT. Defaults to the S2 production endpoint.",
+			},
 		},
 	}
 }
@@ -62,12 +67,16 @@ func (p *S2Provider) Configure(ctx context.Context, req provider.ConfigureReques
 
 	accessToken := strings.TrimSpace(config.AccessToken.ValueString())
 	accountEndpoint := strings.TrimSpace(config.AccountEndpoint.ValueString())
+	basinEndpoint := strings.TrimSpace(config.BasinEndpoint.ValueString())
 
 	if accessToken == "" {
 		accessToken = strings.TrimSpace(os.Getenv("S2_ACCESS_TOKEN"))
 	}
 	if accountEndpoint == "" {
 		accountEndpoint = strings.TrimSpace(os.Getenv("S2_ACCOUNT_ENDPOINT"))
+	}
+	if basinEndpoint == "" {
+		basinEndpoint = strings.TrimSpace(os.Getenv("S2_BASIN_ENDPOINT"))
 	}
 
 	if accessToken == "" {
@@ -80,8 +89,13 @@ func (p *S2Provider) Configure(ctx context.Context, req provider.ConfigureReques
 
 	clientOptions := &s2.ClientOptions{}
 	if accountEndpoint != "" {
-		baseURL := accountEndpointToBaseURL(accountEndpoint)
-		clientOptions.BaseURL = baseURL
+		clientOptions.BaseURL = accountEndpointToBaseURL(accountEndpoint)
+	}
+	if basinEndpoint != "" {
+		clientOptions.MakeBasinBaseURL = basinEndpointToMakeBasinBaseURL(basinEndpoint)
+	} else if accountEndpoint != "" {
+		// No explicit basin endpoint: route basin traffic to the same endpoint (e.g. for local testing).
+		baseURL := clientOptions.BaseURL
 		clientOptions.MakeBasinBaseURL = func(_ string) string { return baseURL }
 	}
 
@@ -102,6 +116,15 @@ func (p *S2Provider) DataSources(_ context.Context) []func() datasource.DataSour
 	return []func() datasource.DataSource{
 		NewBasinDataSource,
 		NewStreamDataSource,
+	}
+}
+
+// basinEndpointToMakeBasinBaseURL returns a MakeBasinBaseURL function for the given basin
+// endpoint. The endpoint may contain a {basin} placeholder in the host (e.g. "{basin}.b.aws.s2.dev"),
+// which is replaced with the actual basin name at call time.
+func basinEndpointToMakeBasinBaseURL(endpoint string) func(string) string {
+	return func(basin string) string {
+		return accountEndpointToBaseURL(strings.ReplaceAll(endpoint, "{basin}", basin))
 	}
 }
 
