@@ -18,4 +18,4 @@ Terraform provider for S2 basins, streams, and access tokens.
 
 - `access_token` (String, Sensitive) S2 access token. Can also be set via S2_ACCESS_TOKEN.
 - `account_endpoint` (String) S2 account endpoint. Can also be set via S2_ACCOUNT_ENDPOINT. Defaults to the S2 production endpoint.
-- `basin_endpoint` (String) S2 basin endpoint. Supports {basin} placeholder (e.g. "{basin}.b.aws.s2.dev"). Can also be set via S2_BASIN_ENDPOINT. Defaults to the S2 production endpoint.
+- `basin_endpoint` (String) S2 basin endpoint. Supports {basin} placeholder (e.g. "{basin}.b.s2.dev"). Can also be set via S2_BASIN_ENDPOINT. Defaults to the S2 production endpoint.

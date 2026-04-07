@@ -51,7 +51,7 @@ func (p *S2Provider) Schema(_ context.Context, _ provider.SchemaRequest, resp *p
 			},
 			"basin_endpoint": providerschema.StringAttribute{
 				Optional:    true,
-				Description: "S2 basin endpoint. Supports {basin} placeholder (e.g. \"{basin}.b.aws.s2.dev\"). Can also be set via S2_BASIN_ENDPOINT. Defaults to the S2 production endpoint.",
+				Description: "S2 basin endpoint. Supports {basin} placeholder (e.g. \"{basin}.b.s2.dev\"). Can also be set via S2_BASIN_ENDPOINT. Defaults to the S2 production endpoint.",
 			},
 		},
 	}
@@ -116,7 +116,7 @@ func (p *S2Provider) DataSources(_ context.Context) []func() datasource.DataSour
 }
 
 // basinEndpointToMakeBasinBaseURL returns a MakeBasinBaseURL function for the given basin
-// endpoint. The endpoint may contain a {basin} placeholder in the host (e.g. "{basin}.b.aws.s2.dev"),
+// endpoint. The endpoint may contain a {basin} placeholder in the host (e.g. "{basin}.b.s2.dev"),
 // which is replaced with the actual basin name at call time.
 func basinEndpointToMakeBasinBaseURL(endpoint string) func(string) string {
 	return func(basin string) string {
