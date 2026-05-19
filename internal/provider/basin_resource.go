@@ -38,6 +38,7 @@ type BasinResourceModel struct {
 	State                types.String `tfsdk:"state"`
 	CreateStreamOnAppend types.Bool   `tfsdk:"create_stream_on_append"`
 	CreateStreamOnRead   types.Bool   `tfsdk:"create_stream_on_read"`
+	StreamCipher         types.String `tfsdk:"stream_cipher"`
 	DefaultStreamConfig  types.Object `tfsdk:"default_stream_config"`
 }
 
@@ -68,7 +69,7 @@ func (r *BasinResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 					stringplanmodifier.UseStateForUnknown(),
 				},
 				Validators: []validator.String{
-					stringvalidator.OneOf(defaultBasinScope),
+					stringvalidator.OneOf(supportedBasinScopes...),
 				},
 			},
 			"state": schema.StringAttribute{
@@ -86,6 +87,16 @@ func (r *BasinResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Computed: true,
 				PlanModifiers: []planmodifier.Bool{
 					boolplanmodifier.UseStateForUnknown(),
+				},
+			},
+			"stream_cipher": schema.StringAttribute{
+				Optional: true,
+				Computed: true,
+				PlanModifiers: []planmodifier.String{
+					stringplanmodifier.UseStateForUnknown(),
+				},
+				Validators: []validator.String{
+					stringvalidator.OneOf(string(s2.EncryptionAlgorithmAegis256), string(s2.EncryptionAlgorithmAes256Gcm)),
 				},
 			},
 		},
@@ -188,7 +199,7 @@ func (r *BasinResource) Create(ctx context.Context, req resource.CreateRequest, 
 		scope = types.StringValue(defaultBasinScope)
 	}
 
-	createArgs := s2.CreateBasinArgs{
+	ensureArgs := s2.EnsureBasinArgs{
 		Basin: s2.BasinName(plan.Name.ValueString()),
 		Scope: s2.Ptr(s2.BasinScope(scope.ValueString())),
 	}
@@ -204,6 +215,11 @@ func (r *BasinResource) Create(ctx context.Context, req resource.CreateRequest, 
 	if !plan.CreateStreamOnRead.IsNull() && !plan.CreateStreamOnRead.IsUnknown() {
 		value := plan.CreateStreamOnRead.ValueBool()
 		basinConfig.CreateStreamOnRead = &value
+		setConfig = true
+	}
+	if !plan.StreamCipher.IsNull() && !plan.StreamCipher.IsUnknown() {
+		algorithm := s2.EncryptionAlgorithm(plan.StreamCipher.ValueString())
+		basinConfig.StreamCipher = &algorithm
 		setConfig = true
 	}
 	if !plan.DefaultStreamConfig.IsNull() && !plan.DefaultStreamConfig.IsUnknown() {
@@ -225,15 +241,11 @@ func (r *BasinResource) Create(ctx context.Context, req resource.CreateRequest, 
 		}
 	}
 	if setConfig {
-		createArgs.Config = basinConfig
+		ensureArgs.Config = basinConfig
 	}
 
-	basinInfo, err := r.client.Basins.Create(ctx, createArgs)
+	ensureResp, err := r.client.Basins.Ensure(ctx, ensureArgs)
 	if err != nil {
-		if isResourceAlreadyExists(err) {
-			resp.Diagnostics.AddError("Basin Already Exists", fmt.Sprintf("Basin %q already exists.", plan.Name.ValueString()))
-			return
-		}
 		if isBasinDeletionPending(err) {
 			resp.Diagnostics.AddError(
 				"Basin Deletion Pending",
@@ -252,28 +264,13 @@ func (r *BasinResource) Create(ctx context.Context, req resource.CreateRequest, 
 		return
 	}
 
-	if basinInfo.State == s2.BasinStateCreating {
-		if err := waitForBasinState(ctx, r.client, basinInfo.Name, s2.BasinStateActive, basinAsyncTimeout); err != nil {
-			resp.Diagnostics.AddError("Failed Waiting for Basin Creation", err.Error())
-			return
-		}
-		refreshedInfo, found, err := findBasinByName(ctx, r.client, basinInfo.Name, false)
-		if err != nil {
-			resp.Diagnostics.AddError("Failed Fetching Basin", err.Error())
-			return
-		}
-		if found {
-			basinInfo = &refreshedInfo
-		}
-	}
-
-	config, err := r.client.Basins.GetConfig(ctx, basinInfo.Name)
+	config, err := r.client.Basins.GetConfig(ctx, ensureResp.Basin.Name)
 	if err != nil {
 		resp.Diagnostics.AddError("Failed Reading Basin Configuration", err.Error())
 		return
 	}
 
-	state := flattenBasinModelFromAPI(ctx, *basinInfo, config)
+	state := flattenBasinModelFromAPI(ctx, ensureResp.Basin, config)
 	state.Name = plan.Name
 	if state.Scope.IsNull() || state.Scope.IsUnknown() {
 		state.Scope = scope
@@ -313,7 +310,7 @@ func (r *BasinResource) Read(ctx context.Context, req resource.ReadRequest, resp
 			}
 
 			newState := state
-			newState.State = types.StringValue(string(basinInfo.State))
+			newState.State = basinStateValue(basinInfo)
 			if newState.Scope.IsNull() || newState.Scope.IsUnknown() {
 				newState.Scope = types.StringValue(string(basinInfo.Scope))
 			}
@@ -355,6 +352,12 @@ func (r *BasinResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
+	var prior BasinResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &prior)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	reconfigure := s2.BasinReconfiguration{}
 	if !plan.CreateStreamOnAppend.IsNull() && !plan.CreateStreamOnAppend.IsUnknown() {
 		value := plan.CreateStreamOnAppend.ValueBool()
@@ -364,6 +367,12 @@ func (r *BasinResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		value := plan.CreateStreamOnRead.ValueBool()
 		reconfigure.CreateStreamOnRead = &value
 	}
+	if !plan.StreamCipher.IsNull() && !plan.StreamCipher.IsUnknown() {
+		algorithm := s2.EncryptionAlgorithm(plan.StreamCipher.ValueString())
+		reconfigure.StreamCipher = &algorithm
+	} else if !prior.StreamCipher.IsNull() && !prior.StreamCipher.IsUnknown() {
+		reconfigure.ClearStreamCipher = true
+	}
 	if !plan.DefaultStreamConfig.IsNull() && !plan.DefaultStreamConfig.IsUnknown() {
 		var cfgModel StreamConfigModel
 		cfgDiags := plan.DefaultStreamConfig.As(ctx, &cfgModel, basetypes.ObjectAsOptions{})
@@ -372,12 +381,25 @@ func (r *BasinResource) Update(ctx context.Context, req resource.UpdateRequest, 
 			return
 		}
 
-		reconfiguredStream, reconfigureDiags := expandStreamReconfiguration(cfgModel)
+		var priorCfgModel *StreamConfigModel
+		if !prior.DefaultStreamConfig.IsNull() && !prior.DefaultStreamConfig.IsUnknown() {
+			var cfg StreamConfigModel
+			priorDiags := prior.DefaultStreamConfig.As(ctx, &cfg, basetypes.ObjectAsOptions{})
+			resp.Diagnostics.Append(priorDiags...)
+			if resp.Diagnostics.HasError() {
+				return
+			}
+			priorCfgModel = &cfg
+		}
+
+		reconfiguredStream, reconfigureDiags := expandStreamReconfigurationWithPrior(cfgModel, priorCfgModel)
 		resp.Diagnostics.Append(reconfigureDiags...)
 		if resp.Diagnostics.HasError() {
 			return
 		}
 		reconfigure.DefaultStreamConfig = &reconfiguredStream
+	} else if !prior.DefaultStreamConfig.IsNull() && !prior.DefaultStreamConfig.IsUnknown() {
+		reconfigure.ClearDefaultStreamConfig = true
 	}
 
 	config, err := r.client.Basins.Reconfigure(ctx, s2.ReconfigureBasinArgs{
@@ -457,9 +479,10 @@ func flattenBasinModelFromAPI(ctx context.Context, info s2.BasinInfo, config *s2
 	state := BasinResourceModel{
 		Name:                 types.StringValue(string(info.Name)),
 		Scope:                types.StringValue(string(info.Scope)),
-		State:                types.StringValue(string(info.State)),
+		State:                basinStateValue(info),
 		CreateStreamOnAppend: types.BoolNull(),
 		CreateStreamOnRead:   types.BoolNull(),
+		StreamCipher:         types.StringNull(),
 		DefaultStreamConfig:  nullStreamConfigObject(),
 	}
 
@@ -471,6 +494,9 @@ func flattenBasinModelFromAPI(ctx context.Context, info s2.BasinInfo, config *s2
 	}
 	if config.CreateStreamOnRead != nil {
 		state.CreateStreamOnRead = types.BoolValue(*config.CreateStreamOnRead)
+	}
+	if config.StreamCipher != nil {
+		state.StreamCipher = types.StringValue(string(*config.StreamCipher))
 	}
 
 	flattenedStreamConfig := flattenStreamConfig(config.DefaultStreamConfig)

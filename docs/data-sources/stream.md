@@ -33,6 +33,7 @@ output "stream_created_at" {
 
 ### Read-Only
 
+- `cipher` (String)
 - `created_at` (String)
 - `delete_on_empty` (Attributes) (see [below for nested schema](#nestedatt--delete_on_empty))
 - `retention_policy` (Attributes) (see [below for nested schema](#nestedatt--retention_policy))

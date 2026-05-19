@@ -52,6 +52,7 @@ resource "s2_basin" "example" {
 - `create_stream_on_read` (Boolean)
 - `default_stream_config` (Block, Optional) (see [below for nested schema](#nestedblock--default_stream_config))
 - `scope` (String)
+- `stream_cipher` (String)
 
 ### Read-Only
 
