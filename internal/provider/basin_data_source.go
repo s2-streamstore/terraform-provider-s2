@@ -25,6 +25,7 @@ type BasinDataSourceModel struct {
 	State                types.String `tfsdk:"state"`
 	CreateStreamOnAppend types.Bool   `tfsdk:"create_stream_on_append"`
 	CreateStreamOnRead   types.Bool   `tfsdk:"create_stream_on_read"`
+	StreamCipher         types.String `tfsdk:"stream_cipher"`
 	DefaultStreamConfig  types.Object `tfsdk:"default_stream_config"`
 }
 
@@ -48,6 +49,7 @@ func (d *BasinDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 			"state":                   schema.StringAttribute{Computed: true},
 			"create_stream_on_append": schema.BoolAttribute{Computed: true},
 			"create_stream_on_read":   schema.BoolAttribute{Computed: true},
+			"stream_cipher":           schema.StringAttribute{Computed: true},
 			"default_stream_config": schema.SingleNestedAttribute{
 				Computed: true,
 				Attributes: map[string]schema.Attribute{

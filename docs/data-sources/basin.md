@@ -36,6 +36,7 @@ output "basin_scope" {
 - `default_stream_config` (Attributes) (see [below for nested schema](#nestedatt--default_stream_config))
 - `scope` (String)
 - `state` (String)
+- `stream_cipher` (String)
 
 <a id="nestedatt--default_stream_config"></a>
 ### Nested Schema for `default_stream_config`

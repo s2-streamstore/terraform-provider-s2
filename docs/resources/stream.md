@@ -55,6 +55,7 @@ resource "s2_stream" "example" {
 
 ### Read-Only
 
+- `cipher` (String)
 - `created_at` (String)
 
 <a id="nestedblock--delete_on_empty"></a>

@@ -23,6 +23,12 @@ const (
 	defaultListPageLimit = 1000
 )
 
+var supportedBasinScopes = []string{
+	string(s2.BasinScopeAwsUsEast1),
+	string(s2.BasinScopeAwsUsWest2),
+	string(s2.BasinScopeAwsEuNorth1),
+}
+
 type StreamConfigModel struct {
 	StorageClass    types.String `tfsdk:"storage_class"`
 	RetentionPolicy types.Object `tfsdk:"retention_policy"`
@@ -555,12 +561,18 @@ func expandOpGroups(model OpGroupsModel) *s2.PermittedOperationGroups {
 }
 
 func expandStreamReconfiguration(model StreamConfigModel) (s2.StreamReconfiguration, diag.Diagnostics) {
+	return expandStreamReconfigurationWithPrior(model, nil)
+}
+
+func expandStreamReconfigurationWithPrior(model StreamConfigModel, prior *StreamConfigModel) (s2.StreamReconfiguration, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	var reconfigure s2.StreamReconfiguration
 
 	if !model.StorageClass.IsNull() && !model.StorageClass.IsUnknown() {
 		storageClass := s2.StorageClass(model.StorageClass.ValueString())
 		reconfigure.StorageClass = &storageClass
+	} else if prior != nil && !prior.StorageClass.IsNull() && !prior.StorageClass.IsUnknown() {
+		reconfigure.ClearStorageClass = true
 	}
 
 	if !model.RetentionPolicy.IsNull() && !model.RetentionPolicy.IsUnknown() {
@@ -569,7 +581,12 @@ func expandStreamReconfiguration(model StreamConfigModel) (s2.StreamReconfigurat
 		diags.Append(retentionDiags...)
 		if !retentionDiags.HasError() {
 			reconfigure.RetentionPolicy = expandRetentionPolicy(retentionModel)
+			if reconfigure.RetentionPolicy == nil && prior != nil && !prior.RetentionPolicy.IsNull() && !prior.RetentionPolicy.IsUnknown() {
+				reconfigure.ClearRetentionPolicy = true
+			}
 		}
+	} else if prior != nil && !prior.RetentionPolicy.IsNull() && !prior.RetentionPolicy.IsUnknown() {
+		reconfigure.ClearRetentionPolicy = true
 	}
 
 	if !model.Timestamping.IsNull() && !model.Timestamping.IsUnknown() {
@@ -577,14 +594,34 @@ func expandStreamReconfiguration(model StreamConfigModel) (s2.StreamReconfigurat
 		tsDiags := model.Timestamping.As(context.Background(), &timestampingModel, basetypes.ObjectAsOptions{})
 		diags.Append(tsDiags...)
 		if !tsDiags.HasError() {
+			timestampingReconfigure := s2.TimestampingReconfiguration{}
 			timestamping := expandTimestamping(timestampingModel)
 			if timestamping != nil {
-				reconfigure.Timestamping = &s2.TimestampingReconfiguration{
-					Mode:     timestamping.Mode,
-					Uncapped: timestamping.Uncapped,
+				timestampingReconfigure.Mode = timestamping.Mode
+				timestampingReconfigure.Uncapped = timestamping.Uncapped
+			}
+			if prior != nil && !prior.Timestamping.IsNull() && !prior.Timestamping.IsUnknown() {
+				var priorTimestamping TimestampingModel
+				priorDiags := prior.Timestamping.As(context.Background(), &priorTimestamping, basetypes.ObjectAsOptions{})
+				diags.Append(priorDiags...)
+				if !priorDiags.HasError() {
+					if timestampingReconfigure.Mode == nil && !priorTimestamping.Mode.IsNull() && !priorTimestamping.Mode.IsUnknown() {
+						timestampingReconfigure.ClearMode = true
+					}
+					if timestampingReconfigure.Uncapped == nil && !priorTimestamping.Uncapped.IsNull() && !priorTimestamping.Uncapped.IsUnknown() {
+						timestampingReconfigure.ClearUncapped = true
+					}
 				}
 			}
+			if timestampingReconfigure.Mode != nil ||
+				timestampingReconfigure.Uncapped != nil ||
+				timestampingReconfigure.ClearMode ||
+				timestampingReconfigure.ClearUncapped {
+				reconfigure.Timestamping = &timestampingReconfigure
+			}
 		}
+	} else if prior != nil && !prior.Timestamping.IsNull() && !prior.Timestamping.IsUnknown() {
+		reconfigure.ClearTimestamping = true
 	}
 
 	if !model.DeleteOnEmpty.IsNull() && !model.DeleteOnEmpty.IsUnknown() {
@@ -592,10 +629,24 @@ func expandStreamReconfiguration(model StreamConfigModel) (s2.StreamReconfigurat
 		doeDiags := model.DeleteOnEmpty.As(context.Background(), &deleteOnEmptyModel, basetypes.ObjectAsOptions{})
 		diags.Append(doeDiags...)
 		if !doeDiags.HasError() {
+			deleteOnEmptyReconfigure := s2.DeleteOnEmptyReconfiguration{}
 			if deleteOnEmpty := expandDeleteOnEmpty(deleteOnEmptyModel); deleteOnEmpty != nil {
-				reconfigure.DeleteOnEmpty = &s2.DeleteOnEmptyReconfiguration{MinAgeSecs: deleteOnEmpty.MinAgeSecs}
+				deleteOnEmptyReconfigure.MinAgeSecs = deleteOnEmpty.MinAgeSecs
+			}
+			if prior != nil && !prior.DeleteOnEmpty.IsNull() && !prior.DeleteOnEmpty.IsUnknown() {
+				var priorDeleteOnEmpty DeleteOnEmptyModel
+				priorDiags := prior.DeleteOnEmpty.As(context.Background(), &priorDeleteOnEmpty, basetypes.ObjectAsOptions{})
+				diags.Append(priorDiags...)
+				if !priorDiags.HasError() && deleteOnEmptyReconfigure.MinAgeSecs == nil && !priorDeleteOnEmpty.MinAgeSecs.IsNull() && !priorDeleteOnEmpty.MinAgeSecs.IsUnknown() {
+					deleteOnEmptyReconfigure.ClearMinAgeSecs = true
+				}
+			}
+			if deleteOnEmptyReconfigure.MinAgeSecs != nil || deleteOnEmptyReconfigure.ClearMinAgeSecs {
+				reconfigure.DeleteOnEmpty = &deleteOnEmptyReconfigure
 			}
 		}
+	} else if prior != nil && !prior.DeleteOnEmpty.IsNull() && !prior.DeleteOnEmpty.IsUnknown() {
+		reconfigure.ClearDeleteOnEmpty = true
 	}
 
 	return reconfigure, diags
@@ -630,33 +681,6 @@ func isDefaultStreamConfig(cfg *s2.StreamConfig) bool {
 	}
 
 	return true
-}
-
-func waitForBasinState(ctx context.Context, client *s2.Client, name s2.BasinName, target s2.BasinState, timeout time.Duration) error {
-	deadline := time.Now().Add(timeout)
-	backoff := initialPollBackoff
-
-	for {
-		basinInfo, found, err := findBasinByName(ctx, client, name, true)
-		if err != nil {
-			return err
-		}
-
-		if found {
-			if basinInfo.State == target {
-				return nil
-			}
-			if basinInfo.State == s2.BasinStateDeleting && target != s2.BasinStateDeleting {
-				return fmt.Errorf("basin %q entered deleting while waiting for %q", name, target)
-			}
-		} else {
-			return fmt.Errorf("basin %q not found while waiting for %q", name, target)
-		}
-
-		if err := sleepWithBackoff(ctx, deadline, &backoff); err != nil {
-			return fmt.Errorf("timed out waiting for basin %q to reach %q", name, target)
-		}
-	}
 }
 
 func waitForBasinDeletion(ctx context.Context, client *s2.Client, name s2.BasinName, timeout time.Duration) error {
@@ -850,6 +874,20 @@ func findAccessTokenByID(ctx context.Context, client *s2.Client, id s2.AccessTok
 	}
 
 	return s2.AccessTokenInfo{}, false, nil
+}
+
+func basinStateValue(info s2.BasinInfo) types.String {
+	if info.DeletedAt != nil {
+		return types.StringValue("deleting")
+	}
+	return types.StringValue("active")
+}
+
+func cipherValue(cipher *s2.EncryptionAlgorithm) types.String {
+	if cipher == nil {
+		return types.StringNull()
+	}
+	return types.StringValue(string(*cipher))
 }
 
 func sleepWithBackoff(ctx context.Context, deadline time.Time, backoff *time.Duration) error {

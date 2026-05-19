@@ -24,6 +24,7 @@ type StreamDataSourceModel struct {
 	Basin           types.String `tfsdk:"basin"`
 	Name            types.String `tfsdk:"name"`
 	CreatedAt       types.String `tfsdk:"created_at"`
+	Cipher          types.String `tfsdk:"cipher"`
 	StorageClass    types.String `tfsdk:"storage_class"`
 	RetentionPolicy types.Object `tfsdk:"retention_policy"`
 	Timestamping    types.Object `tfsdk:"timestamping"`
@@ -51,6 +52,7 @@ func (d *StreamDataSource) Schema(_ context.Context, _ datasource.SchemaRequest,
 				Validators: streamNameValidators(),
 			},
 			"created_at":    schema.StringAttribute{Computed: true},
+			"cipher":        schema.StringAttribute{Computed: true},
 			"storage_class": schema.StringAttribute{Computed: true},
 			"retention_policy": schema.SingleNestedAttribute{
 				Computed: true,
@@ -123,7 +125,7 @@ func (d *StreamDataSource) Read(ctx context.Context, req datasource.ReadRequest,
 		return
 	}
 
-	state := flattenStreamModelFromAPI(config.Basin.ValueString(), config.Name.ValueString(), streamInfo.CreatedAt, streamConfig)
+	state := flattenStreamModelFromAPI(config.Basin.ValueString(), config.Name.ValueString(), streamInfo, streamConfig)
 	if state.CreatedAt.IsNull() {
 		state.CreatedAt = types.StringValue(streamInfo.CreatedAt.Format(time.RFC3339Nano))
 	}

@@ -4,6 +4,11 @@ S2_LITE_PORT ?= 18080
 S2_LITE_BASE_URL ?= http://127.0.0.1:$(S2_LITE_PORT)/v1
 S2_LITE_HEALTH_URL ?= http://127.0.0.1:$(S2_LITE_PORT)/health
 S2_LITE_WAIT_SECS ?= 300
+TFPLUGINDOCS_TF_VERSION ?= 1.14.6
+TFPLUGINDOCS_ARGS := --provider-name s2
+ifneq ($(strip $(TFPLUGINDOCS_TF_VERSION)),)
+TFPLUGINDOCS_ARGS += --tf-version $(TFPLUGINDOCS_TF_VERSION)
+endif
 
 .PHONY: build install generate testacc testacc-lite testacc-lite-managed
 
@@ -14,7 +19,7 @@ install:
 	go install .
 
 generate:
-	tfplugindocs generate --provider-name s2 --tf-version 1.14.6
+	tfplugindocs generate $(TFPLUGINDOCS_ARGS)
 
 testacc:
 	TF_ACC=1 go test ./internal/provider -v -timeout 30m
@@ -27,7 +32,7 @@ testacc-lite:
 			echo "or run: make testacc-lite-managed"; \
 			exit 1; \
 		fi; \
-		TF_ACC=1 S2_ACC_TARGET=lite S2_BASE_URL="$(S2_LITE_BASE_URL)" S2_ACCESS_TOKEN=test go test ./internal/provider -v -timeout 30m \
+		TF_ACC=1 S2_ACC_TARGET=lite S2_ACCOUNT_ENDPOINT="$(S2_LITE_BASE_URL)" S2_BASIN_ENDPOINT="$(S2_LITE_BASE_URL)" S2_ACCESS_TOKEN=test go test ./internal/provider -v -timeout 30m \
 	'
 
 testacc-lite-managed:
@@ -68,5 +73,5 @@ testacc-lite-managed:
 			sed -n "1,120p" "$$log_file"; \
 			exit 1; \
 		fi; \
-		TF_ACC=1 S2_ACC_TARGET=lite S2_BASE_URL="$(S2_LITE_BASE_URL)" S2_ACCESS_TOKEN=test go test ./internal/provider -v -timeout 30m \
+		TF_ACC=1 S2_ACC_TARGET=lite S2_ACCOUNT_ENDPOINT="$(S2_LITE_BASE_URL)" S2_BASIN_ENDPOINT="$(S2_LITE_BASE_URL)" S2_ACCESS_TOKEN=test go test ./internal/provider -v -timeout 30m \
 	'

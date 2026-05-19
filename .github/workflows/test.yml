@@ -17,6 +17,12 @@ jobs:
         with:
           go-version: '1.24.x'
 
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: '1.14.6'
+          terraform_wrapper: false
+
       - name: Download dependencies
         run: go mod download
 
@@ -48,5 +54,5 @@ jobs:
 
       - name: Verify generated docs are up to date
         run: |
-          make generate
+          make generate TFPLUGINDOCS_TF_VERSION=
           git diff --exit-code

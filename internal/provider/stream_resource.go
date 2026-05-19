@@ -34,6 +34,7 @@ type StreamResourceModel struct {
 	Basin           types.String `tfsdk:"basin"`
 	Name            types.String `tfsdk:"name"`
 	CreatedAt       types.String `tfsdk:"created_at"`
+	Cipher          types.String `tfsdk:"cipher"`
 	StorageClass    types.String `tfsdk:"storage_class"`
 	RetentionPolicy types.Object `tfsdk:"retention_policy"`
 	Timestamping    types.Object `tfsdk:"timestamping"`
@@ -71,6 +72,9 @@ func (r *StreamResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
+			},
+			"cipher": schema.StringAttribute{
+				Computed: true,
 			},
 			"storage_class": schema.StringAttribute{
 				Optional: true,
@@ -175,7 +179,7 @@ func (r *StreamResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	streamInfo, err := r.client.Basin(plan.Basin.ValueString()).Streams.Create(ctx, s2.CreateStreamArgs{
+	ensureResp, err := r.client.Basin(plan.Basin.ValueString()).Streams.Ensure(ctx, s2.EnsureStreamArgs{
 		Stream: s2.StreamName(plan.Name.ValueString()),
 		Config: streamConfig,
 	})
@@ -190,7 +194,7 @@ func (r *StreamResource) Create(ctx context.Context, req resource.CreateRequest,
 		return
 	}
 
-	state := flattenStreamModelFromAPI(plan.Basin.ValueString(), plan.Name.ValueString(), streamInfo.CreatedAt, cfg)
+	state := flattenStreamModelFromAPI(plan.Basin.ValueString(), plan.Name.ValueString(), ensureResp.Stream, cfg)
 	if plan.RetentionPolicy.IsNull() {
 		state.RetentionPolicy = plan.RetentionPolicy
 	}
@@ -227,12 +231,15 @@ func (r *StreamResource) Read(ctx context.Context, req resource.ReadRequest, res
 	}
 
 	createdAt := state.CreatedAt.ValueString()
+	cipher := state.Cipher
 	if found {
 		createdAt = streamInfo.CreatedAt.Format(time.RFC3339Nano)
+		cipher = cipherValue(streamInfo.Cipher)
 	}
 
-	newState := flattenStreamModelFromAPI(state.Basin.ValueString(), state.Name.ValueString(), streamInfo.CreatedAt, cfg)
+	newState := flattenStreamModelFromAPI(state.Basin.ValueString(), state.Name.ValueString(), streamInfo, cfg)
 	newState.CreatedAt = types.StringValue(createdAt)
+	newState.Cipher = cipher
 	if state.RetentionPolicy.IsNull() {
 		newState.RetentionPolicy = state.RetentionPolicy
 	}
@@ -252,12 +259,24 @@ func (r *StreamResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	reconfigure, reconfigureDiags := expandStreamReconfiguration(StreamConfigModel{
+	var prior StreamResourceModel
+	resp.Diagnostics.Append(req.State.Get(ctx, &prior)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	priorConfig := StreamConfigModel{
+		StorageClass:    prior.StorageClass,
+		RetentionPolicy: prior.RetentionPolicy,
+		Timestamping:    prior.Timestamping,
+		DeleteOnEmpty:   prior.DeleteOnEmpty,
+	}
+	reconfigure, reconfigureDiags := expandStreamReconfigurationWithPrior(StreamConfigModel{
 		StorageClass:    plan.StorageClass,
 		RetentionPolicy: plan.RetentionPolicy,
 		Timestamping:    plan.Timestamping,
 		DeleteOnEmpty:   plan.DeleteOnEmpty,
-	})
+	}, &priorConfig)
 	resp.Diagnostics.Append(reconfigureDiags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -272,20 +291,17 @@ func (r *StreamResource) Update(ctx context.Context, req resource.UpdateRequest,
 		return
 	}
 
-	var state StreamResourceModel
-	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
-
-	createdAt := state.CreatedAt.ValueString()
+	createdAt := prior.CreatedAt.ValueString()
+	cipher := prior.Cipher
 	streamInfo, found, err := findStreamByName(ctx, r.client, plan.Basin.ValueString(), s2.StreamName(plan.Name.ValueString()), true)
 	if err == nil && found {
 		createdAt = streamInfo.CreatedAt.Format(time.RFC3339Nano)
+		cipher = cipherValue(streamInfo.Cipher)
 	}
 
-	newState := flattenStreamModelFromAPI(plan.Basin.ValueString(), plan.Name.ValueString(), time.Time{}, cfg)
+	newState := flattenStreamModelFromAPI(plan.Basin.ValueString(), plan.Name.ValueString(), s2.StreamInfo{}, cfg)
 	newState.CreatedAt = types.StringValue(createdAt)
+	newState.Cipher = cipher
 	if plan.RetentionPolicy.IsNull() {
 		newState.RetentionPolicy = plan.RetentionPolicy
 	}
@@ -348,20 +364,22 @@ func (r *StreamResource) ImportState(ctx context.Context, req resource.ImportSta
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), parts[1])...)
 }
 
-func flattenStreamModelFromAPI(basin string, name string, createdAt time.Time, cfg *s2.StreamConfig) StreamResourceModel {
+func flattenStreamModelFromAPI(basin string, name string, info s2.StreamInfo, cfg *s2.StreamConfig) StreamResourceModel {
 	state := StreamResourceModel{
 		Basin:           types.StringValue(basin),
 		Name:            types.StringValue(name),
 		CreatedAt:       types.StringNull(),
+		Cipher:          types.StringNull(),
 		StorageClass:    types.StringNull(),
 		RetentionPolicy: nullRetentionPolicyObject(),
 		Timestamping:    nullTimestampingObject(),
 		DeleteOnEmpty:   nullDeleteOnEmptyObject(),
 	}
 
-	if !createdAt.IsZero() {
-		state.CreatedAt = types.StringValue(createdAt.Format(time.RFC3339Nano))
+	if !info.CreatedAt.IsZero() {
+		state.CreatedAt = types.StringValue(info.CreatedAt.Format(time.RFC3339Nano))
 	}
+	state.Cipher = cipherValue(info.Cipher)
 
 	if cfg == nil {
 		return state
