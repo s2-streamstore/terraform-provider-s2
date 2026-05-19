@@ -7,10 +7,8 @@ require (
 	github.com/hashicorp/terraform-plugin-framework-validators v0.19.0
 	github.com/hashicorp/terraform-plugin-go v0.30.0
 	github.com/hashicorp/terraform-plugin-testing v1.14.0
-	github.com/s2-streamstore/s2-sdk-go v0.16.2-0.20260516030346-f878c273804b
+	github.com/s2-streamstore/s2-sdk-go v0.16.2-0.20260516031011-e46538d4555f
 )
-
-replace github.com/s2-streamstore/s2-sdk-go => ../s2-sdk-go-old
 
 require (
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
