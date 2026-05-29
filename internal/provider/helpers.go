@@ -20,6 +20,7 @@ const (
 	initialPollBackoff   = 500 * time.Millisecond
 	maxPollBackoff       = 5 * time.Second
 	defaultListPageLimit = 1000
+	defaultRetentionAge  = 7 * 24 * 60 * 60
 )
 
 type StreamConfigModel struct {
@@ -655,7 +656,10 @@ func isDefaultStreamConfig(cfg *s2.StreamConfig) bool {
 	}
 
 	if cfg.RetentionPolicy != nil {
-		if cfg.RetentionPolicy.Age != nil || cfg.RetentionPolicy.Infinite != nil {
+		if cfg.RetentionPolicy.Infinite != nil {
+			return false
+		}
+		if cfg.RetentionPolicy.Age != nil && *cfg.RetentionPolicy.Age != defaultRetentionAge {
 			return false
 		}
 	}
@@ -674,6 +678,16 @@ func isDefaultStreamConfig(cfg *s2.StreamConfig) bool {
 	}
 
 	return true
+}
+
+func applyDefaultStreamConfigState(ctx context.Context, src, stateDefaultStreamConfig types.Object, cfg *s2.StreamConfig) types.Object {
+	if src.IsNull() || src.IsUnknown() {
+		if isDefaultStreamConfig(cfg) {
+			return types.ObjectNull(streamConfigAttrTypes())
+		}
+		return stateDefaultStreamConfig
+	}
+	return applyDefaultStreamConfigNullOverrides(ctx, src, stateDefaultStreamConfig)
 }
 
 func waitForBasinDeletion(ctx context.Context, client *s2.Client, name s2.BasinName, timeout time.Duration) error {

@@ -184,6 +184,34 @@ func TestCipherValue(t *testing.T) {
 	}
 }
 
+func TestIsDefaultStreamConfigRecognizesConcreteServiceDefaults(t *testing.T) {
+	t.Parallel()
+
+	storageClass := s2.StorageClassExpress
+	retentionAge := int64(defaultRetentionAge)
+	timestampMode := s2.TimestampingModeClientPrefer
+	uncapped := false
+	deleteOnEmptyMinAge := int64(0)
+
+	cfg := &s2.StreamConfig{
+		StorageClass: &storageClass,
+		RetentionPolicy: &s2.RetentionPolicy{
+			Age: &retentionAge,
+		},
+		Timestamping: &s2.TimestampingConfig{
+			Mode:     &timestampMode,
+			Uncapped: &uncapped,
+		},
+		DeleteOnEmpty: &s2.DeleteOnEmptyConfig{
+			MinAgeSecs: &deleteOnEmptyMinAge,
+		},
+	}
+
+	if !isDefaultStreamConfig(cfg) {
+		t.Fatal("expected concrete service defaults to be treated as default stream config")
+	}
+}
+
 func TestExpandStreamReconfigurationWithPriorClearsRemovedFields(t *testing.T) {
 	t.Parallel()
 

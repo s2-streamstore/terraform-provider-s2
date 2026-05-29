@@ -273,11 +273,7 @@ func (r *BasinResource) Create(ctx context.Context, req resource.CreateRequest, 
 	if (state.Location.IsNull() || state.Location.IsUnknown()) && !plan.Location.IsNull() && !plan.Location.IsUnknown() {
 		state.Location = plan.Location
 	}
-	if plan.DefaultStreamConfig.IsNull() {
-		state.DefaultStreamConfig = plan.DefaultStreamConfig
-	} else {
-		state.DefaultStreamConfig = applyDefaultStreamConfigNullOverrides(ctx, plan.DefaultStreamConfig, state.DefaultStreamConfig)
-	}
+	state.DefaultStreamConfig = applyDefaultStreamConfigState(ctx, plan.DefaultStreamConfig, state.DefaultStreamConfig, config.DefaultStreamConfig)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -334,11 +330,7 @@ func (r *BasinResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	if newState.Location.IsNull() || newState.Location.IsUnknown() {
 		newState.Location = state.Location
 	}
-	if state.DefaultStreamConfig.IsNull() && isDefaultStreamConfig(config.DefaultStreamConfig) {
-		newState.DefaultStreamConfig = state.DefaultStreamConfig
-	} else {
-		newState.DefaultStreamConfig = applyDefaultStreamConfigNullOverrides(ctx, state.DefaultStreamConfig, newState.DefaultStreamConfig)
-	}
+	newState.DefaultStreamConfig = applyDefaultStreamConfigState(ctx, state.DefaultStreamConfig, newState.DefaultStreamConfig, config.DefaultStreamConfig)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
 }
@@ -424,11 +416,7 @@ func (r *BasinResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	if state.Location.IsNull() || state.Location.IsUnknown() {
 		state.Location = plan.Location
 	}
-	if plan.DefaultStreamConfig.IsNull() {
-		state.DefaultStreamConfig = plan.DefaultStreamConfig
-	} else {
-		state.DefaultStreamConfig = applyDefaultStreamConfigNullOverrides(ctx, plan.DefaultStreamConfig, state.DefaultStreamConfig)
-	}
+	state.DefaultStreamConfig = applyDefaultStreamConfigState(ctx, plan.DefaultStreamConfig, state.DefaultStreamConfig, config.DefaultStreamConfig)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
