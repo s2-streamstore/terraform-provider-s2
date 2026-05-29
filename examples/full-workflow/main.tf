@@ -45,8 +45,8 @@ locals {
 }
 
 resource "s2_basin" "main" {
-  name  = local.basin_name
-  scope = "aws:us-east-1"
+  name     = local.basin_name
+  location = "aws:us-east-1"
 
   create_stream_on_append = false
   create_stream_on_read   = false

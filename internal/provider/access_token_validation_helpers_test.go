@@ -17,6 +17,9 @@ func TestAccessTokenOperationsContainsKnownValues(t *testing.T) {
 
 	want := []string{
 		s2.OperationListBasins,
+		s2.OperationListLocations,
+		s2.OperationGetDefaultLocation,
+		s2.OperationSetDefaultLocation,
 		s2.OperationCreateStream,
 		s2.OperationAppend,
 		s2.OperationRead,

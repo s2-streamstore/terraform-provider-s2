@@ -17,8 +17,8 @@ data "s2_basin" "example" {
   name = "my-example-basin"
 }
 
-output "basin_scope" {
-  value = data.s2_basin.example.scope
+output "basin_location" {
+  value = data.s2_basin.example.location
 }
 ```
 
@@ -34,7 +34,7 @@ output "basin_scope" {
 - `create_stream_on_append` (Boolean)
 - `create_stream_on_read` (Boolean)
 - `default_stream_config` (Attributes) (see [below for nested schema](#nestedatt--default_stream_config))
-- `scope` (String)
+- `location` (String)
 - `state` (String)
 - `stream_cipher` (String)
 

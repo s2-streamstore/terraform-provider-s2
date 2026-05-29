@@ -1,6 +1,6 @@
 resource "s2_basin" "example" {
-  name  = "my-example-basin"
-  scope = "aws:us-east-1"
+  name     = "my-example-basin"
+  location = "aws:us-east-1"
 
   create_stream_on_append = false
   create_stream_on_read   = false
