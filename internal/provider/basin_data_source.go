@@ -21,7 +21,7 @@ type BasinDataSource struct {
 
 type BasinDataSourceModel struct {
 	Name                 types.String `tfsdk:"name"`
-	Scope                types.String `tfsdk:"scope"`
+	Location             types.String `tfsdk:"location"`
 	State                types.String `tfsdk:"state"`
 	CreateStreamOnAppend types.Bool   `tfsdk:"create_stream_on_append"`
 	CreateStreamOnRead   types.Bool   `tfsdk:"create_stream_on_read"`
@@ -45,7 +45,7 @@ func (d *BasinDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 				Required:   true,
 				Validators: basinNameValidators(),
 			},
-			"scope":                   schema.StringAttribute{Computed: true},
+			"location":                schema.StringAttribute{Computed: true},
 			"state":                   schema.StringAttribute{Computed: true},
 			"create_stream_on_append": schema.BoolAttribute{Computed: true},
 			"create_stream_on_read":   schema.BoolAttribute{Computed: true},

@@ -112,6 +112,8 @@ func (p *S2Provider) DataSources(_ context.Context) []func() datasource.DataSour
 	return []func() datasource.DataSource{
 		NewBasinDataSource,
 		NewStreamDataSource,
+		NewLocationsDataSource,
+		NewDefaultLocationDataSource,
 	}
 }
 

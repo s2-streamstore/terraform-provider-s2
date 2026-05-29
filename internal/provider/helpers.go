@@ -15,19 +15,12 @@ import (
 )
 
 const (
-	defaultBasinScope    = string(s2.BasinScopeAwsUsEast1)
 	basinAsyncTimeout    = 5 * time.Minute
 	streamDeleteTimeout  = 2 * time.Minute
 	initialPollBackoff   = 500 * time.Millisecond
 	maxPollBackoff       = 5 * time.Second
 	defaultListPageLimit = 1000
 )
-
-var supportedBasinScopes = []string{
-	string(s2.BasinScopeAwsUsEast1),
-	string(s2.BasinScopeAwsUsWest2),
-	string(s2.BasinScopeAwsEuNorth1),
-}
 
 type StreamConfigModel struct {
 	StorageClass    types.String `tfsdk:"storage_class"`

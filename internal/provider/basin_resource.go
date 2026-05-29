@@ -34,7 +34,7 @@ type BasinResource struct {
 
 type BasinResourceModel struct {
 	Name                 types.String `tfsdk:"name"`
-	Scope                types.String `tfsdk:"scope"`
+	Location             types.String `tfsdk:"location"`
 	State                types.String `tfsdk:"state"`
 	CreateStreamOnAppend types.Bool   `tfsdk:"create_stream_on_append"`
 	CreateStreamOnRead   types.Bool   `tfsdk:"create_stream_on_read"`
@@ -61,7 +61,7 @@ func (r *BasinResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				},
 				Validators: basinNameValidators(),
 			},
-			"scope": schema.StringAttribute{
+			"location": schema.StringAttribute{
 				Optional: true,
 				Computed: true,
 				PlanModifiers: []planmodifier.String{
@@ -69,7 +69,7 @@ func (r *BasinResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 					stringplanmodifier.UseStateForUnknown(),
 				},
 				Validators: []validator.String{
-					stringvalidator.OneOf(supportedBasinScopes...),
+					stringvalidator.LengthBetween(1, 64),
 				},
 			},
 			"state": schema.StringAttribute{
@@ -194,14 +194,12 @@ func (r *BasinResource) Create(ctx context.Context, req resource.CreateRequest, 
 		return
 	}
 
-	scope := plan.Scope
-	if scope.IsNull() || scope.IsUnknown() {
-		scope = types.StringValue(defaultBasinScope)
-	}
-
 	ensureArgs := s2.EnsureBasinArgs{
 		Basin: s2.BasinName(plan.Name.ValueString()),
-		Scope: s2.Ptr(s2.BasinScope(scope.ValueString())),
+	}
+	if !plan.Location.IsNull() && !plan.Location.IsUnknown() {
+		location := s2.LocationName(plan.Location.ValueString())
+		ensureArgs.Location = &location
 	}
 
 	basinConfig := &s2.BasinConfig{}
@@ -272,8 +270,8 @@ func (r *BasinResource) Create(ctx context.Context, req resource.CreateRequest, 
 
 	state := flattenBasinModelFromAPI(ctx, ensureResp.Basin, config)
 	state.Name = plan.Name
-	if state.Scope.IsNull() || state.Scope.IsUnknown() {
-		state.Scope = scope
+	if (state.Location.IsNull() || state.Location.IsUnknown()) && !plan.Location.IsNull() && !plan.Location.IsUnknown() {
+		state.Location = plan.Location
 	}
 	if plan.DefaultStreamConfig.IsNull() {
 		state.DefaultStreamConfig = plan.DefaultStreamConfig
@@ -311,8 +309,8 @@ func (r *BasinResource) Read(ctx context.Context, req resource.ReadRequest, resp
 
 			newState := state
 			newState.State = basinStateValue(basinInfo)
-			if newState.Scope.IsNull() || newState.Scope.IsUnknown() {
-				newState.Scope = types.StringValue(string(basinInfo.Scope))
+			if basinInfo.Location != nil {
+				newState.Location = types.StringValue(string(*basinInfo.Location))
 			}
 			resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
 			return
@@ -333,8 +331,8 @@ func (r *BasinResource) Read(ctx context.Context, req resource.ReadRequest, resp
 
 	newState := flattenBasinModelFromAPI(ctx, basinInfo, config)
 	newState.Name = state.Name
-	if newState.Scope.IsNull() {
-		newState.Scope = state.Scope
+	if newState.Location.IsNull() || newState.Location.IsUnknown() {
+		newState.Location = state.Location
 	}
 	if state.DefaultStreamConfig.IsNull() && isDefaultStreamConfig(config.DefaultStreamConfig) {
 		newState.DefaultStreamConfig = state.DefaultStreamConfig
@@ -423,8 +421,8 @@ func (r *BasinResource) Update(ctx context.Context, req resource.UpdateRequest, 
 
 	state := flattenBasinModelFromAPI(ctx, basinInfo, config)
 	state.Name = plan.Name
-	if state.Scope.IsNull() || state.Scope.IsUnknown() {
-		state.Scope = plan.Scope
+	if state.Location.IsNull() || state.Location.IsUnknown() {
+		state.Location = plan.Location
 	}
 	if plan.DefaultStreamConfig.IsNull() {
 		state.DefaultStreamConfig = plan.DefaultStreamConfig
@@ -478,12 +476,16 @@ func (r *BasinResource) ImportState(ctx context.Context, req resource.ImportStat
 func flattenBasinModelFromAPI(ctx context.Context, info s2.BasinInfo, config *s2.BasinConfig) BasinResourceModel {
 	state := BasinResourceModel{
 		Name:                 types.StringValue(string(info.Name)),
-		Scope:                types.StringValue(string(info.Scope)),
+		Location:             types.StringNull(),
 		State:                basinStateValue(info),
 		CreateStreamOnAppend: types.BoolNull(),
 		CreateStreamOnRead:   types.BoolNull(),
 		StreamCipher:         types.StringNull(),
 		DefaultStreamConfig:  nullStreamConfigObject(),
+	}
+
+	if info.Location != nil {
+		state.Location = types.StringValue(string(*info.Location))
 	}
 
 	if config == nil {

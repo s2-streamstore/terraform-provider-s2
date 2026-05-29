@@ -14,8 +14,8 @@ Manages an S2 basin.
 
 ```terraform
 resource "s2_basin" "example" {
-  name  = "my-example-basin"
-  scope = "aws:us-east-1"
+  name     = "my-example-basin"
+  location = "aws:us-east-1"
 
   create_stream_on_append = false
   create_stream_on_read   = false
@@ -51,7 +51,7 @@ resource "s2_basin" "example" {
 - `create_stream_on_append` (Boolean)
 - `create_stream_on_read` (Boolean)
 - `default_stream_config` (Block, Optional) (see [below for nested schema](#nestedblock--default_stream_config))
-- `scope` (String)
+- `location` (String)
 - `stream_cipher` (String)
 
 ### Read-Only

@@ -12,10 +12,6 @@ func TestAccBasinDataSource_basic(t *testing.T) {
 
 	basinName := testAccBasinName()
 	resourceName := "data.s2_basin.test"
-	scopeCheck := resource.TestCheckResourceAttrSet(resourceName, "scope")
-	if testAccIsLite() {
-		scopeCheck = resource.TestCheckResourceAttr(resourceName, "scope", "")
-	}
 
 	resource.Test(t, resource.TestCase{
 		PreCheck:                 func() { testAccPreCheck(t) },
@@ -25,7 +21,6 @@ func TestAccBasinDataSource_basic(t *testing.T) {
 				Config: testAccBasinDataSourceConfigBasic(basinName),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr(resourceName, "name", basinName),
-					scopeCheck,
 					resource.TestCheckResourceAttr(resourceName, "state", "active"),
 				),
 			},

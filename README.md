@@ -77,6 +77,8 @@ Data sources:
 
 - `s2_basin` - [`docs/data-sources/basin.md`](./docs/data-sources/basin.md)
 - `s2_stream` - [`docs/data-sources/stream.md`](./docs/data-sources/stream.md)
+- `s2_locations` - [`docs/data-sources/locations.md`](./docs/data-sources/locations.md)
+- `s2_default_location` - [`docs/data-sources/default_location.md`](./docs/data-sources/default_location.md)
 
 ## Examples
 
@@ -90,6 +92,8 @@ The [`examples`](./examples) directory includes ready-to-run configurations:
 | [`examples/resources/s2_access_token/resource.tf`](./examples/resources/s2_access_token/resource.tf) | Issue an access token |
 | [`examples/data-sources/s2_basin/data-source.tf`](./examples/data-sources/s2_basin/data-source.tf) | Read basin metadata |
 | [`examples/data-sources/s2_stream/data-source.tf`](./examples/data-sources/s2_stream/data-source.tf) | Read stream metadata |
+| [`examples/data-sources/s2_locations/data-source.tf`](./examples/data-sources/s2_locations/data-source.tf) | List available locations |
+| [`examples/data-sources/s2_default_location/data-source.tf`](./examples/data-sources/s2_default_location/data-source.tf) | Read the default location |
 | [`examples/full-workflow/main.tf`](./examples/full-workflow/main.tf) | End-to-end basin, stream, token, and data-source workflow |
 
 ## Development
