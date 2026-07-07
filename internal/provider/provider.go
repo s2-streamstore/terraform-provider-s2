@@ -126,8 +126,8 @@ func basinEndpointToMakeBasinBaseURL(endpoint string) func(string) string {
 	}
 }
 
-// accountEndpointToBaseURL converts a user-supplied endpoint (e.g. "aws.s2.dev" or
-// "localhost:8080") to the full base URL used by the SDK (e.g. "https://aws.s2.dev/v1").
+// accountEndpointToBaseURL converts a user-supplied endpoint (e.g. "a.s2.dev" or
+// "localhost:8080") to the full base URL used by the SDK (e.g. "https://a.s2.dev/v1").
 // A scheme is added when absent (http for localhost, https otherwise).
 // /v1 is appended when the endpoint has no explicit path component.
 func accountEndpointToBaseURL(endpoint string) string {

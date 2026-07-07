@@ -31,7 +31,7 @@ tokens.
    ```bash
    export S2_ACCESS_TOKEN="<your access token>"
    # Optional:
-   # export S2_ACCOUNT_ENDPOINT="aws.s2.dev"
+   # export S2_ACCOUNT_ENDPOINT="a.s2.dev"
    ```
 
 4. Configure the provider:
