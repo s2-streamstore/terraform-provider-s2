@@ -31,6 +31,8 @@ func TestAccBasinResource_basic(t *testing.T) {
 				ImportStateId:                        basinName,
 				ImportStateVerify:                    true,
 				ImportStateVerifyIdentifierAttribute: "name",
+				// Imports include defaults omitted from configuration.
+				ImportStateVerifyIgnore: []string{"default_stream_config"},
 			},
 		},
 	})

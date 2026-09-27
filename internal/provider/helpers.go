@@ -20,7 +20,6 @@ const (
 	initialPollBackoff   = 500 * time.Millisecond
 	maxPollBackoff       = 5 * time.Second
 	defaultListPageLimit = 1000
-	defaultRetentionAge  = 7 * 24 * 60 * 60
 )
 
 type StreamConfigModel struct {
@@ -163,9 +162,7 @@ func flattenStreamConfig(cfg *s2.StreamConfig) StreamConfigModel {
 		return model
 	}
 
-	if cfg.StorageClass != nil {
-		model.StorageClass = types.StringValue(string(*cfg.StorageClass))
-	}
+	model.StorageClass = types.StringPointerValue(cfg.StorageClass)
 
 	retention := flattenRetentionPolicy(cfg.RetentionPolicy)
 	model.RetentionPolicy = types.ObjectValueMust(retentionPolicyAttrTypes(), map[string]attr.Value{
@@ -331,8 +328,7 @@ func expandStreamConfig(model StreamConfigModel) (*s2.StreamConfig, diag.Diagnos
 	setAny := false
 
 	if !model.StorageClass.IsNull() && !model.StorageClass.IsUnknown() {
-		storageClass := s2.StorageClass(model.StorageClass.ValueString())
-		cfg.StorageClass = &storageClass
+		cfg.StorageClass = model.StorageClass.ValueStringPointer()
 		setAny = true
 	}
 
@@ -563,8 +559,7 @@ func expandStreamReconfigurationWithPrior(model StreamConfigModel, prior *Stream
 	var reconfigure s2.StreamReconfiguration
 
 	if !model.StorageClass.IsNull() && !model.StorageClass.IsUnknown() {
-		storageClass := s2.StorageClass(model.StorageClass.ValueString())
-		reconfigure.StorageClass = &storageClass
+		reconfigure.StorageClass = model.StorageClass.ValueStringPointer()
 	} else if prior != nil && !prior.StorageClass.IsNull() && !prior.StorageClass.IsUnknown() {
 		reconfigure.ClearStorageClass = true
 	}
@@ -644,50 +639,6 @@ func expandStreamReconfigurationWithPrior(model StreamConfigModel, prior *Stream
 	}
 
 	return reconfigure, diags
-}
-
-func isDefaultStreamConfig(cfg *s2.StreamConfig) bool {
-	if cfg == nil {
-		return true
-	}
-
-	if cfg.StorageClass != nil && *cfg.StorageClass != s2.StorageClassExpress {
-		return false
-	}
-
-	if cfg.RetentionPolicy != nil {
-		if cfg.RetentionPolicy.Infinite != nil {
-			return false
-		}
-		if cfg.RetentionPolicy.Age != nil && *cfg.RetentionPolicy.Age != defaultRetentionAge {
-			return false
-		}
-	}
-
-	if cfg.Timestamping != nil {
-		if cfg.Timestamping.Mode != nil && *cfg.Timestamping.Mode != s2.TimestampingModeClientPrefer {
-			return false
-		}
-		if cfg.Timestamping.Uncapped != nil && *cfg.Timestamping.Uncapped {
-			return false
-		}
-	}
-
-	if cfg.DeleteOnEmpty != nil && cfg.DeleteOnEmpty.MinAgeSecs != nil && *cfg.DeleteOnEmpty.MinAgeSecs != 0 {
-		return false
-	}
-
-	return true
-}
-
-func applyDefaultStreamConfigState(ctx context.Context, src, stateDefaultStreamConfig types.Object, cfg *s2.StreamConfig) types.Object {
-	if src.IsNull() || src.IsUnknown() {
-		if isDefaultStreamConfig(cfg) {
-			return types.ObjectNull(streamConfigAttrTypes())
-		}
-		return stateDefaultStreamConfig
-	}
-	return applyDefaultStreamConfigNullOverrides(ctx, src, stateDefaultStreamConfig)
 }
 
 func waitForBasinDeletion(ctx context.Context, client *s2.Client, name s2.BasinName, timeout time.Duration) error {
@@ -970,7 +921,10 @@ func applyStreamConfigNullOverrides(src, dst StreamConfigModel) StreamConfigMode
 // default_stream_config nested object within a basin state, using src (plan or prior
 // state) as the source of null overrides.
 func applyDefaultStreamConfigNullOverrides(ctx context.Context, src, stateDefaultStreamConfig types.Object) types.Object {
-	if src.IsNull() || src.IsUnknown() {
+	if src.IsNull() {
+		return src
+	}
+	if src.IsUnknown() {
 		return stateDefaultStreamConfig
 	}
 	if stateDefaultStreamConfig.IsNull() || stateDefaultStreamConfig.IsUnknown() {

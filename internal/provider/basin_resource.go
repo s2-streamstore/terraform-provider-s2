@@ -102,18 +102,17 @@ func (r *BasinResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 		},
 		Blocks: map[string]schema.Block{
 			"default_stream_config": schema.SingleNestedBlock{
+				Description: "Default configuration for new streams. Omit this block to leave these defaults managed by S2.",
 				PlanModifiers: []planmodifier.Object{
 					objectplanmodifier.UseStateForUnknown(),
 				},
 				Attributes: map[string]schema.Attribute{
 					"storage_class": schema.StringAttribute{
-						Optional: true,
-						Computed: true,
+						Description: "Storage-class name. If omitted at creation, uses the location's default.",
+						Optional:    true,
+						Computed:    true,
 						PlanModifiers: []planmodifier.String{
 							stringplanmodifier.UseStateForUnknown(),
-						},
-						Validators: []validator.String{
-							stringvalidator.OneOf(string(s2.StorageClassExpress), string(s2.StorageClassStandard)),
 						},
 					},
 				},
@@ -273,7 +272,7 @@ func (r *BasinResource) Create(ctx context.Context, req resource.CreateRequest, 
 	if (state.Location.IsNull() || state.Location.IsUnknown()) && !plan.Location.IsNull() && !plan.Location.IsUnknown() {
 		state.Location = plan.Location
 	}
-	state.DefaultStreamConfig = applyDefaultStreamConfigState(ctx, plan.DefaultStreamConfig, state.DefaultStreamConfig, config.DefaultStreamConfig)
+	state.DefaultStreamConfig = applyDefaultStreamConfigNullOverrides(ctx, plan.DefaultStreamConfig, state.DefaultStreamConfig)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -330,7 +329,7 @@ func (r *BasinResource) Read(ctx context.Context, req resource.ReadRequest, resp
 	if newState.Location.IsNull() || newState.Location.IsUnknown() {
 		newState.Location = state.Location
 	}
-	newState.DefaultStreamConfig = applyDefaultStreamConfigState(ctx, state.DefaultStreamConfig, newState.DefaultStreamConfig, config.DefaultStreamConfig)
+	newState.DefaultStreamConfig = applyDefaultStreamConfigNullOverrides(ctx, state.DefaultStreamConfig, newState.DefaultStreamConfig)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &newState)...)
 }
@@ -416,7 +415,7 @@ func (r *BasinResource) Update(ctx context.Context, req resource.UpdateRequest, 
 	if state.Location.IsNull() || state.Location.IsUnknown() {
 		state.Location = plan.Location
 	}
-	state.DefaultStreamConfig = applyDefaultStreamConfigState(ctx, plan.DefaultStreamConfig, state.DefaultStreamConfig, config.DefaultStreamConfig)
+	state.DefaultStreamConfig = applyDefaultStreamConfigNullOverrides(ctx, plan.DefaultStreamConfig, state.DefaultStreamConfig)
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
@@ -459,6 +458,17 @@ func (r *BasinResource) Delete(ctx context.Context, req resource.DeleteRequest, 
 
 func (r *BasinResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
 	resource.ImportStatePassthroughID(ctx, path.Root("name"), req, resp)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	config, err := r.client.Basins.GetConfig(ctx, s2.BasinName(req.ID))
+	if err != nil {
+		resp.Diagnostics.AddError("Failed Reading Basin Configuration", err.Error())
+		return
+	}
+	state := flattenBasinModelFromAPI(ctx, s2.BasinInfo{}, config)
+	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("default_stream_config"), state.DefaultStreamConfig)...)
 }
 
 func flattenBasinModelFromAPI(ctx context.Context, info s2.BasinInfo, config *s2.BasinConfig) BasinResourceModel {

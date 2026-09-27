@@ -50,7 +50,7 @@ resource "s2_basin" "example" {
 
 - `create_stream_on_append` (Boolean)
 - `create_stream_on_read` (Boolean)
-- `default_stream_config` (Block, Optional) (see [below for nested schema](#nestedblock--default_stream_config))
+- `default_stream_config` (Block, Optional) Default configuration for new streams. Omit this block to leave these defaults managed by S2. (see [below for nested schema](#nestedblock--default_stream_config))
 - `location` (String)
 - `stream_cipher` (String)
 
@@ -65,7 +65,7 @@ Optional:
 
 - `delete_on_empty` (Block, Optional) (see [below for nested schema](#nestedblock--default_stream_config--delete_on_empty))
 - `retention_policy` (Block, Optional) (see [below for nested schema](#nestedblock--default_stream_config--retention_policy))
-- `storage_class` (String)
+- `storage_class` (String) Storage-class name. If omitted at creation, uses the location's default.
 - `timestamping` (Block, Optional) (see [below for nested schema](#nestedblock--default_stream_config--timestamping))
 
 <a id="nestedblock--default_stream_config--delete_on_empty"></a>

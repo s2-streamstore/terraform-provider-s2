@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -18,8 +19,10 @@ var (
 )
 
 type LocationModel struct {
-	Name      types.String `tfsdk:"name"`
-	IsPrivate types.Bool   `tfsdk:"is_private"`
+	Name                types.String `tfsdk:"name"`
+	IsPrivate           types.Bool   `tfsdk:"is_private"`
+	StorageClasses      types.List   `tfsdk:"storage_classes"`
+	DefaultStorageClass types.String `tfsdk:"default_storage_class"`
 }
 
 type LocationsDataSource struct {
@@ -90,11 +93,6 @@ type DefaultLocationDataSource struct {
 	client *s2.Client
 }
 
-type DefaultLocationDataSourceModel struct {
-	Name      types.String `tfsdk:"name"`
-	IsPrivate types.Bool   `tfsdk:"is_private"`
-}
-
 func NewDefaultLocationDataSource() datasource.DataSource {
 	return &DefaultLocationDataSource{}
 }
@@ -138,7 +136,7 @@ func (d *DefaultLocationDataSource) Read(ctx context.Context, _ datasource.ReadR
 		return
 	}
 
-	state := DefaultLocationDataSourceModel(flattenLocationInfo(*location))
+	state := flattenLocationInfo(*location)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
@@ -146,12 +144,31 @@ func locationAttributeSchema() map[string]schema.Attribute {
 	return map[string]schema.Attribute{
 		"name":       schema.StringAttribute{Computed: true},
 		"is_private": schema.BoolAttribute{Computed: true},
+		"storage_classes": schema.ListAttribute{
+			Description: "Storage classes available to the account in this location.",
+			Computed:    true,
+			ElementType: types.StringType,
+		},
+		"default_storage_class": schema.StringAttribute{
+			Description: "Default storage class for new basins in this location.",
+			Computed:    true,
+		},
 	}
 }
 
 func flattenLocationInfo(info s2.LocationInfo) LocationModel {
-	return LocationModel{
-		Name:      types.StringValue(string(info.Name)),
-		IsPrivate: types.BoolValue(info.IsPrivate),
+	model := LocationModel{
+		Name:                types.StringValue(string(info.Name)),
+		IsPrivate:           types.BoolValue(info.IsPrivate),
+		StorageClasses:      types.ListNull(types.StringType),
+		DefaultStorageClass: types.StringPointerValue(info.DefaultStorageClass),
 	}
+	if info.StorageClasses != nil {
+		classes := make([]attr.Value, len(info.StorageClasses))
+		for i, class := range info.StorageClasses {
+			classes[i] = types.StringValue(class)
+		}
+		model.StorageClasses = types.ListValueMust(types.StringType, classes)
+	}
+	return model
 }

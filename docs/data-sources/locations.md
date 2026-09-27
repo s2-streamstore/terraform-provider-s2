@@ -32,5 +32,7 @@ output "available_locations" {
 
 Read-Only:
 
+- `default_storage_class` (String) Default storage class for new basins in this location.
 - `is_private` (Boolean)
 - `name` (String)
+- `storage_classes` (List of String) Storage classes available to the account in this location.

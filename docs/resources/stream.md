@@ -50,7 +50,7 @@ resource "s2_stream" "example" {
 
 - `delete_on_empty` (Block, Optional) (see [below for nested schema](#nestedblock--delete_on_empty))
 - `retention_policy` (Block, Optional) (see [below for nested schema](#nestedblock--retention_policy))
-- `storage_class` (String)
+- `storage_class` (String) Storage-class name. If omitted at creation, uses the basin's default.
 - `timestamping` (Block, Optional) (see [below for nested schema](#nestedblock--timestamping))
 
 ### Read-Only

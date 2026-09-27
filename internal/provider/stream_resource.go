@@ -77,13 +77,11 @@ func (r *StreamResource) Schema(_ context.Context, _ resource.SchemaRequest, res
 				Computed: true,
 			},
 			"storage_class": schema.StringAttribute{
-				Optional: true,
-				Computed: true,
+				Description: "Storage-class name. If omitted at creation, uses the basin's default.",
+				Optional:    true,
+				Computed:    true,
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
-				},
-				Validators: []validator.String{
-					stringvalidator.OneOf(string(s2.StorageClassExpress), string(s2.StorageClassStandard)),
 				},
 			},
 		},
